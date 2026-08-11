@@ -92,6 +92,7 @@ class SettingsVerificationAiProbeTests(unittest.TestCase):
             (probe.get("parsed_output") or {}).get("schema_version"),
             "verification_ai_v1",
         )
+        self.assertEqual(mock_post.call_args.kwargs.get("timeout"), (5, 20))
 
     @patch("outlook_web.services.verification_extractor.requests.post")
     def test_verification_ai_test_connectivity_ok_when_contract_invalid(self, mock_post):

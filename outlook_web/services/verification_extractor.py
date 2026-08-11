@@ -30,6 +30,8 @@ LINK_CONTEXT_PHRASES = vce.LINK_CONTEXT_PHRASES
 HTMLTextExtractor = vce.HTMLTextExtractor
 
 VERIFICATION_AI_SCHEMA_VERSION = "verification_ai_v1"
+VERIFICATION_AI_CONNECT_TIMEOUT_SECONDS = 5
+VERIFICATION_AI_READ_TIMEOUT_SECONDS = 20
 _LOGGER = logging.getLogger("outlook_web.services.verification_extractor")
 
 
@@ -292,7 +294,15 @@ def _call_verification_ai(ai_config: Dict[str, Any], ai_input: Dict[str, Any]) -
     }
 
     try:
-        response = requests.post(endpoint, headers=headers, json=body, timeout=6)
+        response = requests.post(
+            endpoint,
+            headers=headers,
+            json=body,
+            timeout=(
+                VERIFICATION_AI_CONNECT_TIMEOUT_SECONDS,
+                VERIFICATION_AI_READ_TIMEOUT_SECONDS,
+            ),
+        )
         response.raise_for_status()
         payload = response.json()
         choices = payload.get("choices") if isinstance(payload, dict) else None
@@ -315,7 +325,7 @@ def probe_verification_ai_runtime(
     code_regex: str | None = None,
     code_length: str | None = "6-6",
     code_source: str = "all",
-    timeout_seconds: int = 8,
+    timeout_seconds: int = VERIFICATION_AI_READ_TIMEOUT_SECONDS,
 ) -> Dict[str, Any]:
     endpoint = _normalize_verification_ai_endpoint(str((ai_config or {}).get("base_url") or ""))
     model = str((ai_config or {}).get("model") or "").strip()
@@ -380,7 +390,10 @@ def probe_verification_ai_runtime(
             endpoint,
             headers=headers,
             json=body,
-            timeout=max(1, int(timeout_seconds)),
+            timeout=(
+                VERIFICATION_AI_CONNECT_TIMEOUT_SECONDS,
+                max(1, int(timeout_seconds)),
+            ),
         )
         latency_ms = int((time.monotonic() - started) * 1000)
 

@@ -7,6 +7,37 @@ from outlook_web.services import verification_extractor as extractor
 
 
 class VerificationAiJsonContractTests(unittest.TestCase):
+    @patch("outlook_web.services.verification_extractor.requests.post")
+    def test_ai_fallback_uses_connect_and_read_timeouts(self, mock_post):
+        class _Resp:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {
+                    "choices": [
+                        {
+                            "message": {
+                                "content": '{"verification_code":"123456","verification_link":"","confidence":"high","reason":"ok"}'
+                            }
+                        }
+                    ]
+                }
+
+        mock_post.return_value = _Resp()
+
+        result = extractor._call_verification_ai(
+            {
+                "base_url": "https://api.example.com/v1/chat/completions",
+                "api_key": "sk-test",
+                "model": "gpt-4.1-mini",
+            },
+            {"schema_version": "verification_ai_v1"},
+        )
+
+        self.assertEqual(result.get("verification_code"), "123456")
+        self.assertEqual(mock_post.call_args.kwargs.get("timeout"), (5, 20))
+
     def test_build_ai_input_payload_has_fixed_schema(self):
         payload = extractor.build_verification_ai_input_payload(
             {
