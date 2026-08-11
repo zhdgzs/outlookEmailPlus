@@ -178,7 +178,7 @@ def api_key_required(f):
     对外开放 API 的 API Key 校验装饰器。
 
     规则：
-    1. 仅接受 Header 中的 `X-API-Key`
+    1. 优先接受 Header 中的 `X-API-Key`；Header 为空时接受 URL 查询参数 `token`
     2. 未配置 legacy key 且没有任何启用中的多 Key 时返回 403（API_KEY_NOT_CONFIGURED）
     3. 缺少或错误时返回 401（UNAUTHORIZED）
     4. 不依赖 session，不触发登录跳转
@@ -190,7 +190,9 @@ def api_key_required(f):
         from outlook_web.repositories import settings as settings_repo
 
         g.external_api_consumer = None
-        provided_key = (request.headers.get("X-API-Key") or "").strip()
+        header_key = (request.headers.get("X-API-Key") or "").strip()
+        query_key = (request.args.get("token") or "").strip()
+        provided_key = header_key or query_key
         if not provided_key:
             return (
                 jsonify(

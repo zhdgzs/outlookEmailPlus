@@ -22,11 +22,19 @@ Current contract:
 
 ## Authentication and Access Rules
 
-All `/api/external/*` endpoints require:
+All `/api/external/*` endpoints require API key authentication. Passing the key in a request header is recommended:
 
 ```text
 X-API-Key: YOUR_API_KEY
 ```
+
+The key can also be passed through the `token` URL query parameter for direct browser requests:
+
+```text
+/api/external/verification-code?email=user@example.com&token=YOUR_API_KEY
+```
+
+If both `X-API-Key` and `token` are provided, `X-API-Key` takes precedence. URLs may be recorded in browser history, reverse proxies, and access logs, so prefer the request header in production.
 
 Two key models are supported:
 
@@ -96,6 +104,7 @@ Time fields use ISO 8601, for example:
 | `GET /api/external/messages/{message_id}` | get message details | Optional |
 | `GET /api/external/messages/{message_id}/raw` | get raw message content | Optional for debugging |
 | `GET /api/external/verification-code` | extract a verification code | Common |
+| `GET /api/external/code` | return a verification code as plain text | Direct browser requests |
 | `GET /api/external/verification-link` | extract a verification link | Common |
 | `GET /api/external/wait-message` | wait for a new message | Common |
 | `GET /api/external/probe/{probe_id}` | query async wait status | Needed for `mode=async` |
@@ -273,6 +282,18 @@ Notes:
 
 - if `since_minutes` is omitted, the current implementation defaults to the last `10` minutes
 - only high-confidence codes are returned as successful results
+
+### `GET /api/external/code`
+
+Purpose: return the verification code as `text/plain; charset=utf-8` for direct browser requests.
+
+Query parameters, extraction, authentication, and error handling are identical to `/api/external/verification-code`. On success, the response body contains only the code without a JSON envelope. Failures still use the standard JSON error response.
+
+```text
+GET /api/external/code?email=user@example.com&token=YOUR_API_KEY
+
+123456
+```
 
 ### `GET /api/external/verification-link`
 

@@ -225,6 +225,36 @@ class ExternalApiAuthTests(ExternalApiBaseTest):
         self.assertTrue(data.get("success"))
         self.assertEqual(data.get("code"), "OK")
 
+    def test_external_health_accepts_legacy_api_key_from_token_query(self):
+        client = self.app.test_client()
+        self._set_external_api_key("abc123")
+
+        resp = client.get("/api/external/health?token=abc123")
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.get_json().get("success"))
+
+    def test_external_health_accepts_multi_api_key_from_token_query(self):
+        client = self.app.test_client()
+        self._create_external_api_key("partner-a", "multi-123")
+
+        resp = client.get("/api/external/health?token=multi-123")
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.get_json().get("success"))
+
+    def test_external_health_prefers_header_over_token_query(self):
+        client = self.app.test_client()
+        self._set_external_api_key("valid-query-key")
+
+        resp = client.get(
+            "/api/external/health?token=valid-query-key",
+            headers=self._auth_headers("invalid-header-key"),
+        )
+
+        self.assertEqual(resp.status_code, 401)
+        self.assertEqual(resp.get_json().get("code"), "UNAUTHORIZED")
+
     def test_external_health_accepts_valid_multi_api_key(self):
         client = self.app.test_client()
         self._create_external_api_key("partner-a", "multi-123")
@@ -533,6 +563,31 @@ class ExternalApiVerificationTests(ExternalApiBaseTest):
         data = resp.get_json()
         self.assertTrue(data.get("success"))
         self.assertEqual(data.get("data", {}).get("verification_code"), "123456")
+
+    @patch("outlook_web.services.graph.get_email_raw_graph")
+    @patch("outlook_web.services.graph.get_email_detail_graph")
+    @patch("outlook_web.services.graph.get_emails_graph")
+    def test_external_code_returns_plain_text(
+        self,
+        mock_get_emails_graph,
+        mock_get_email_detail_graph,
+        mock_get_email_raw_graph,
+    ):
+        email_addr = self._insert_outlook_account()
+        self._set_external_api_key("abc123")
+        mock_get_emails_graph.return_value = {
+            "success": True,
+            "emails": [self._graph_email()],
+        }
+        mock_get_email_detail_graph.return_value = self._graph_detail(body_text="Your code is Ab12Cd")
+        mock_get_email_raw_graph.return_value = "RAW MIME CONTENT"
+
+        client = self.app.test_client()
+        resp = client.get(f"/api/external/code?email={email_addr}&token=abc123")
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.content_type, "text/plain; charset=utf-8")
+        self.assertEqual(resp.get_data(as_text=True), "Ab12Cd")
 
     @patch("outlook_web.services.graph.get_emails_graph")
     def test_external_verification_code_defaults_to_recent_10_minutes(self, mock_get_emails_graph):

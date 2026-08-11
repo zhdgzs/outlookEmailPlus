@@ -69,6 +69,11 @@ def create_blueprint() -> Blueprint:
         methods=["GET"],
     )
     bp.add_url_rule(
+        "/api/external/code",
+        view_func=emails_controller.api_external_get_code,
+        methods=["GET"],
+    )
+    bp.add_url_rule(
         "/api/external/verification-link",
         view_func=emails_controller.api_external_get_verification_link,
         methods=["GET"],

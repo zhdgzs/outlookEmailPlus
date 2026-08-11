@@ -1360,6 +1360,22 @@ def api_external_get_message_raw(message_id: str) -> Any:
 @api_key_required
 @external_api_guards()
 def api_external_get_verification_code() -> Any:
+    return _api_external_get_verification_code(
+        endpoint="/api/external/verification-code",
+        plain_text=False,
+    )
+
+
+@api_key_required
+@external_api_guards()
+def api_external_get_code() -> Any:
+    return _api_external_get_verification_code(
+        endpoint="/api/external/code",
+        plain_text=True,
+    )
+
+
+def _api_external_get_verification_code(*, endpoint: str, plain_text: bool) -> Any:
     try:
         args = _parse_external_common_args(default_since_minutes=10)
         code_length = (request.args.get("code_length") or "").strip() or None
@@ -1386,20 +1402,26 @@ def api_external_get_verification_code() -> Any:
         external_api_service.audit_external_api_access(
             action="external_api_access",
             email_addr=args["email"] or "",
-            endpoint="/api/external/verification-code",
+            endpoint=endpoint,
             status="ok",
             details={
                 "matched_email_id": result.get("matched_email_id"),
                 "method": result.get("method"),
             },
         )
+        if plain_text:
+            return current_app.response_class(
+                response=str(result["verification_code"]),
+                status=200,
+                content_type="text/plain; charset=utf-8",
+            )
         return jsonify(external_api_service.ok(result))
     except external_api_service.ExternalApiError as exc:
         resolved = _resolve_external_error(exc)
         external_api_service.audit_external_api_access(
             action="external_api_access",
             email_addr=(request.args.get("email") or "").strip(),
-            endpoint="/api/external/verification-code",
+            endpoint=endpoint,
             status="error",
             details={"code": resolved["code"]},
         )
@@ -1408,7 +1430,7 @@ def api_external_get_verification_code() -> Any:
         external_api_service.audit_external_api_access(
             action="external_api_access",
             email_addr=(request.args.get("email") or "").strip(),
-            endpoint="/api/external/verification-code",
+            endpoint=endpoint,
             status="error",
             details={"code": "INVALID_PARAM"},
         )
@@ -1417,7 +1439,7 @@ def api_external_get_verification_code() -> Any:
         external_api_service.audit_external_api_access(
             action="external_api_access",
             email_addr=(request.args.get("email") or "").strip(),
-            endpoint="/api/external/verification-code",
+            endpoint=endpoint,
             status="error",
             details={"code": "INTERNAL_ERROR"},
         )
